@@ -1,0 +1,17 @@
+# GUI Framework
+customtkinter==6.0.0
+pillow==10.1.0
+
+# Environment & Config
+python-dotenv==1.0.0
+
+# LLM Integration (Local) - for Text-to-SQL
+ollama
+
+# Basic utilities
+requests
+sqlparse==0.4.4
+pygments==2.17.2
+tqdm
+
+# SQLite (built-in with Python, no install needed)
