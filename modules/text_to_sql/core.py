@@ -1,4 +1,5 @@
 import sqlite3
+import ollama
 import pandas as pd
 import re
 from pathlib import Path

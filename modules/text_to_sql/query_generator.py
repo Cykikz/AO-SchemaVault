@@ -61,6 +61,11 @@ class SQLGenerator:
         """Return a bucket name that tunes the prompt."""
         q = " ".join(question.lower().split())
 
+        # Forward / subsequent window takes priority: "next N days after X"
+        # implies a forward-looking aggregate even if the trigger is a crossover.
+        if re.search(r'\b(subsequent|following|next \d+ (trading )?days|over the next|after the (signal|cross))\b', q):
+            return "forward_window"
+
         if re.search(r'\b(cross(es|ed|ing)?\s*(above|below|over|under))\b', q) or \
            re.search(r'\b(golden|death)\s*cross\b', q):
             return "cross_below" if re.search(r'\b(crosses? below|death cross)\b', q) else "cross_above"
@@ -73,9 +78,6 @@ class SQLGenerator:
 
         if re.search(r'\b(categoriz\w*|regime\w*|bucket\w*|classif\w*|segments?)\b|\bgroup by\s+(category|bucket)\b', q):
             return "categorize"
-
-        if re.search(r'\b(subsequent|following|next \d+ (trading )?days|after the (signal|cross))\b', q):
-            return "forward_window"
 
         if re.search(r'\b(monthly|by month|per month|calendar month)\b', q):
             return "time_series"
@@ -131,12 +133,37 @@ class SQLGenerator:
             "streak": (
                 "This asks for consecutive-day sequences (e.g. N days in a row meeting a "
                 "condition). The date column is a TEXT ISO string (YYYY-MM-DD), so you cannot "
-                "do date arithmetic like date - INTERVAL 1 DAY. Use LAG()/LEAD() window "
-                "functions over the ordered date to compare consecutive rows. Use window "
-                "functions inside a subquery/CTE (they cannot be in WHERE clauses in SQLite). "
-                "Use a gap-and-island approach: assign a group id via SUM(flag) OVER (ORDER BY "
-                "date), group consecutive days, and return start/end dates and requested "
-                "aggregates. Only include streaks meeting the minimum length."
+                "do date arithmetic like date - INTERVAL 1 DAY. Detect the start of each streak "
+                "with a separate LAG() step, then use a gap-and-island SUM OVER. Use EXACTLY "
+                "this working SQLite shape (adapt table and column names; here 'cond' is the "
+                "boolean condition, e.g. daily_return > 0):\n"
+                "  WITH base AS (\n"
+                "    SELECT date, cond_col,\n"
+                "           LAG(cond_col) OVER (ORDER BY date) AS prev\n"
+                "    FROM tbl\n"
+                "  ),\n"
+                "  flagged AS (\n"
+                "    SELECT date, cond_col,\n"
+                "           CASE WHEN prev IS NULL OR NOT prev THEN 1 ELSE 0 END AS new_group\n"
+                "    FROM base\n"
+                "  ),\n"
+                "  grps AS (\n"
+                "    SELECT date, cond_col,\n"
+                "           SUM(new_group) OVER (ORDER BY date) AS grp\n"
+                "    FROM flagged\n"
+                "  ),\n"
+                "  agg AS (\n"
+                "    SELECT grp, MIN(date) AS start_date, MAX(date) AS end_date,\n"
+                "           COUNT(*) AS n, SUM(daily_return) AS cumulative_return\n"
+                "    FROM grps WHERE cond_col\n"
+                "    GROUP BY grp\n"
+                "  )\n"
+                "  SELECT start_date, end_date, cumulative_return\n"
+                "  FROM agg WHERE n >= 3\n"
+                "  ORDER BY start_date\n"
+                "CRITICAL: NEVER put LAG()/LEAD() inside another window function (e.g. "
+                "SUM(CASE WHEN LAG(x)...) OVER ...). Compute LAG/LEAD in its own CTE first, "
+                "then reference the column in a later CTE."
             ),
             "running": (
                 "This needs a running/cumulative or drawdown calculation. Use SQLite window "
@@ -151,11 +178,43 @@ class SQLGenerator:
                 "aggregates (COUNT, AVG, SUM)."
             ),
             "forward_window": (
-                "This asks for the average (or other aggregate) over the subsequent N trading "
-                "days AFTER a signal. Detect the signal days first (e.g. a crossover via LAG in "
-                "a CTE). Then compute the average of the NEXT N rows for each signal date using "
-                "LEAD() over the ordered date, or a self-join on date ranges. Window functions "
-                "must live in a subquery/CTE, not a WHERE clause."
+                "This asks for an average (or other aggregate) over the NEXT N trading days "
+                "AFTER a signal event (e.g. a crossover). First identify the signal rows "
+                "(e.g. a crossover using LAG in a CTE). Then, for each signal row, average the "
+                "value over the following N rows by computing LEAD(value, k) OVER (ORDER BY "
+                "date) for k = 1..N in a CTE, and averaging those LEAD columns. The date column "
+                "is a TEXT ISO string so use LAG/LEAD ordered by date (never INTERVAL math).\n"
+                "Example shape (crossover detection as the 'signal'):\n"
+                "  WITH base AS (\n"
+                "    SELECT date, close, macd, macd_signal\n"
+                "    FROM tbl\n"
+                "  ),\n"
+                "  sig AS (\n"
+                "    SELECT date, close,\n"
+                "           LAG(macd) OVER (ORDER BY date) AS pm,\n"
+                "           LAG(macd_signal) OVER (ORDER BY date) AS ps,\n"
+                "           macd, macd_signal\n"
+                "    FROM base\n"
+                "  ),\n"
+                "  crossed AS (\n"
+                "    SELECT date, close FROM sig\n"
+                "    WHERE macd > macd_signal AND COALESCE(pm,0) <= COALESCE(ps,0)\n"
+                "  ),\n"
+                "  future AS (\n"
+                "    SELECT date, LEAD(close,1) OVER (ORDER BY date) AS c1,\n"
+                "           LEAD(close,2) OVER (ORDER BY date) AS c2,\n"
+                "           LEAD(close,3) OVER (ORDER BY date) AS c3,\n"
+                "           LEAD(close,4) OVER (ORDER BY date) AS c4,\n"
+                "           LEAD(close,5) OVER (ORDER BY date) AS c5\n"
+                "    FROM tbl\n"
+                "  )\n"
+                "  SELECT x.date AS signal_date,\n"
+                "         (x.close + f.c1 + f.c2 + f.c3 + f.c4 + f.c5)/6.0 AS avg_next_5\n"
+                "  FROM crossed x JOIN future f ON x.date = f.date\n"
+                "CRITICAL: every column you reference in a later CTE's WHERE must be selected "
+                "in that CTE's SELECT list (e.g. if you filter s.macd, macd must be in the "
+                "sig CTE's SELECT). Use the real column names and never put window functions "
+                "in a WHERE clause."
             ),
             "time_series": (
                 "This asks for a calendar-month grouping. Use strftime('%Y-%m', date_col) as "
