@@ -5,6 +5,8 @@
 
 SchemaVaultLocal is a **local-first, private-by-design** SQL workbench. It leverages local LLMs (via Ollama) to convert natural language into expert-level SQL, enabling seamless data analysis without ever sending your sensitive datasets to the cloud.
 
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/ec706174-862e-41aa-8b0e-7006ac3817be" />
+
 ---
 
 ## ✨ Key Features
