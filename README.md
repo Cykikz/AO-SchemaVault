@@ -7,6 +7,14 @@ SchemaVaultLocal is a **local-first, private-by-design** SQL workbench. It lever
 
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/ec706174-862e-41aa-8b0e-7006ac3817be" />
 
+### 💡 About this Project
+**SchemaVaultLocal** is a local-first, private-by-design SQL workbench. It solves the "blank page" problem for data analysts and traders by using local LLM inference to turn natural language into high-precision, window-function-optimized SQLite queries.
+
+**What it does:**
+- **Local-Only Intelligence**: Runs fully offline using [Ollama](https://ollama.com/), keeping your sensitive financial data off the cloud.
+- **SQL-First Logic**: It isn't just a chatbot; it uses an iterative "Self-Correction Loop" that reads execution errors and automatically refines queries until they run perfectly.
+- **Data Workbench**: A seamless interface to visualize trends, export findings, and keep a persistent history of your analysis.
+
 ---
 
 ## ✨ Key Features
@@ -36,6 +44,16 @@ SchemaVaultLocal is a **local-first, private-by-design** SQL workbench. It lever
 - **GUI**: CustomTkinter (Modern, Dark/Light themed)
 - **Data**: Pandas + SQLite3
 - **Visualization**: Matplotlib
+
+---
+
+## 🤖 What was built with AO (Agent Orchestrator)
+This project was developed in an accelerated, AI-augmented workflow using **AO (Agent Orchestrator)**. AO acted as the lead engineer to ensure enterprise-grade code quality and logical consistency:
+
+*   **Logical Architecture**: AO implemented the "System Rulebook" and "Few-Shot Prompting" to prevent common LLM pitfalls (like integer division errors or schema hallucinations).
+*   **Self-Correcting Engine**: AO engineered the auto-retry execution loop that feeds SQL error traces back into the model, ensuring high success rates for complex time-series queries.
+*   **Seamless UI Design**: AO refactored the entire interface to remove boxy clutter, implementing a cohesive, unified dashboard experience without using external CSS frameworks.
+*   **Feature Integration**: AO handled the complex wiring of history persistence, iterative refinement, and dynamic model detection, ensuring that the app works out-of-the-box with any local LLM.
 
 ---
 

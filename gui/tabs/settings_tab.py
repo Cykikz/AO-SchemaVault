@@ -23,6 +23,19 @@ class SettingsTab:
             'api_key': '',
             'local_model': 'llama3.1:8b'
         }
+
+    def get_available_models(self):
+        """Fetch list of models from Ollama"""
+        try:
+            import ollama
+            models_info = ollama.list()
+            # Handle different versions of python-ollama (list vs dict)
+            if hasattr(models_info, 'models'):
+                return [m.model for m in models_info.models]
+            return [m['name'] for m in models_info.get('models', [])]
+        except Exception as e:
+            self.app.logger.warning(f"Could not fetch models from Ollama: {e}")
+            return ["llama3.1:8b"] # Fallback
     
     def save_settings(self):
         """Save settings to file"""
@@ -77,7 +90,7 @@ class SettingsTab:
         self.model_var = ctk.StringVar(value=self.settings['local_model'])
         model_dropdown = ctk.CTkComboBox(
             self.local_model_frame,
-            values=["llama3.1:8b", "llama3.1:70b", "llama3.2:3b", "sqlcoder:7b"],
+            values=self.get_available_models(),
             variable=self.model_var,
             state="readonly"
         )
