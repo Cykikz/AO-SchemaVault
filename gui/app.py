@@ -51,8 +51,7 @@ class MainApplication(ctk.CTk):
             width=280,
             corner_radius=0,
             fg_color=AppTheme.SIDEBAR_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
+            border_width=0,
         )
         sidebar.grid(row=0, column=0, sticky="nsw")
         sidebar.grid_propagate(False)
@@ -153,10 +152,9 @@ class MainApplication(ctk.CTk):
 
         topbar = ctk.CTkFrame(
             content,
-            corner_radius=8,
+            corner_radius=0,
             fg_color=AppTheme.CARD_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
+            border_width=0,
         )
         topbar.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 10))
         topbar.grid_columnconfigure(0, weight=1)
@@ -223,8 +221,7 @@ class MainApplication(ctk.CTk):
             height=34,
             corner_radius=0,
             fg_color=AppTheme.SIDEBAR_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
+            border_width=0,
         )
         self.status_frame.grid(row=1, column=0, sticky="ew")
         self.status_frame.grid_propagate(False)

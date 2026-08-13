@@ -7,6 +7,9 @@ import customtkinter as ctk
 from tkinter import filedialog
 import threading
 from pathlib import Path
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import pandas as pd
 from config.settings import TextToSQLConfig
 from gui.theme import AppTheme
 from modules.text_to_sql.core import TextToSQLModule
@@ -78,15 +81,29 @@ class TextToSQLTab:
         self.create_schema_viewer(right_column)
         self.create_results_area(right_column)
     
+        # Use transparent frames to blend into background
+        self.parent.configure(fg_color="transparent")
+        
+        # Left and Right main columns
+        left_column = ctk.CTkFrame(self.parent, fg_color="transparent")
+        left_column.grid(row=1, column=0, padx=(12, 8), pady=(0, 12), sticky="nsew")
+        left_column.grid_columnconfigure(0, weight=1)
+        left_column.grid_rowconfigure(1, weight=1)
+
+        right_column = ctk.CTkFrame(self.parent, fg_color="transparent")
+        right_column.grid(row=1, column=1, padx=(8, 12), pady=(0, 12), sticky="nsew")
+        right_column.grid_columnconfigure(0, weight=1)
+        right_column.grid_rowconfigure(1, weight=1)
+
+        self.create_input_area(left_column)
+        self.create_sql_area(left_column)
+        self.create_action_buttons(left_column)
+        self.create_schema_viewer(right_column)
+        self.create_results_area(right_column)
+    
     def create_input_area(self, parent):
         """Natural language input area"""
-        frame = ctk.CTkFrame(
-            parent,
-            corner_radius=8,
-            fg_color=AppTheme.CARD_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
-        )
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.grid(row=0, column=0, pady=(0, 8), sticky="ew")
         frame.grid_columnconfigure(0, weight=1)
         
@@ -96,7 +113,7 @@ class TextToSQLTab:
             anchor="w",
             text_color=AppTheme.TEXT_PRIMARY,
             font=ctk.CTkFont(size=12, weight="bold"),
-        ).grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
+        ).grid(row=0, column=0, padx=0, pady=(0, 4), sticky="w")
         
         self.input_text = ctk.CTkEntry(
             frame,
@@ -104,10 +121,10 @@ class TextToSQLTab:
             height=36,
             corner_radius=6,
             fg_color=AppTheme.INPUT_BG,
-            border_color=AppTheme.BORDER,
+            border_width=0,
             text_color=AppTheme.TEXT_PRIMARY,
         )
-        self.input_text.grid(row=1, column=0, padx=(12, 8), pady=(0, 10), sticky="ew")
+        self.input_text.grid(row=1, column=0, padx=(0, 8), pady=(0, 10), sticky="ew")
         
         self.generate_btn = ctk.CTkButton(
             frame,
@@ -119,19 +136,12 @@ class TextToSQLTab:
             fg_color=AppTheme.BRAND,
             hover_color=AppTheme.BRAND_HOVER,
             text_color=AppTheme.TEXT_ON_ACCENT,
-            text_color_disabled=AppTheme.TEXT_MUTED,
         )
-        self.generate_btn.grid(row=1, column=1, padx=(0, 12), pady=(0, 10))
+        self.generate_btn.grid(row=1, column=1, padx=0, pady=(0, 10))
     
     def create_sql_area(self, parent):
         """SQL query display area"""
-        frame = ctk.CTkFrame(
-            parent,
-            corner_radius=8,
-            fg_color=AppTheme.CARD_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
-        )
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.grid(row=1, column=0, pady=(0, 8), sticky="ew")
         frame.grid_columnconfigure(0, weight=1)
         
@@ -141,72 +151,73 @@ class TextToSQLTab:
             anchor="w",
             text_color=AppTheme.TEXT_PRIMARY,
             font=ctk.CTkFont(size=12, weight="bold"),
-        ).grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
+        ).grid(row=0, column=0, padx=0, pady=(0, 4), sticky="w")
         
         self.sql_text = ctk.CTkTextbox(
             frame,
             height=176,
             wrap="word",
             corner_radius=6,
-            fg_color=AppTheme.CARD_SUBTLE_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER,
+            fg_color=AppTheme.INPUT_BG,
+            border_width=0,
             text_color=AppTheme.TEXT_PRIMARY,
             font=self.mono_font,
         )
-        self.sql_text.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="ew")
+        self.sql_text.grid(row=1, column=0, padx=0, pady=(0, 10), sticky="ew")
         self.sql_text.insert(
             "1.0",
             "-- Generated SQL will appear here.\n-- Review it before execution.",
         )
+        
+        self.save_favorite_btn = ctk.CTkButton(
+            frame,
+            text="Save to Favorites",
+            command=self.save_favorite,
+            state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN,
+            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT,
+            corner_radius=6,
+            height=28,
+        )
+        self.save_favorite_btn.grid(row=2, column=0, padx=0, pady=(0, 10), sticky="ew")
     
     def create_results_area(self, parent):
         """Query results display area"""
-        frame = ctk.CTkFrame(
-            parent,
-            corner_radius=8,
-            fg_color=AppTheme.CARD_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
-        )
-        frame.grid(row=1, column=0, sticky="nsew")
-        frame.grid_rowconfigure(1, weight=1)
-        frame.grid_columnconfigure(0, weight=1)
+        self.results_container = ctk.CTkFrame(parent, fg_color="transparent")
+        self.results_container.grid(row=1, column=0, sticky="nsew")
+        self.results_container.grid_rowconfigure(0, weight=1)
+        self.results_container.grid_columnconfigure(0, weight=1)
         
-        ctk.CTkLabel(
-            frame,
-            text="Results",
-            anchor="w",
-            text_color=AppTheme.TEXT_PRIMARY,
-            font=ctk.CTkFont(size=12, weight="bold"),
-        ).grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
-        
+        # Text view (default)
         self.results_text = ctk.CTkTextbox(
-            frame,
+            self.results_container,
             wrap="none",
             corner_radius=6,
-            fg_color=AppTheme.CARD_SUBTLE_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER,
+            fg_color=AppTheme.INPUT_BG,
+            border_width=0,
             text_color=AppTheme.TEXT_PRIMARY,
             font=self.mono_font,
         )
-        self.results_text.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="nsew")
+        self.results_text.grid(row=0, column=0, sticky="nsew")
         self.results_text.insert("1.0", "Run a query to see results.")
+        
+        # Chart view (hidden initially)
+        self.chart_frame = ctk.CTkFrame(self.results_container, fg_color="transparent")
+        # chart_frame is NOT gridded until toggled
+        
+        self.is_visualizing = False
     
     def create_action_buttons(self, parent):
         """Action buttons"""
         frame = ctk.CTkFrame(
             parent,
-            corner_radius=8,
-            fg_color=AppTheme.CARD_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
+            corner_radius=0,
+            fg_color="transparent",
+            border_width=0,
         )
         frame.grid(row=2, column=0, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, weight=1)
+        frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
         
         self.execute_btn = ctk.CTkButton(
             frame,
@@ -216,11 +227,10 @@ class TextToSQLTab:
             fg_color=AppTheme.BRAND,
             hover_color=AppTheme.BRAND_HOVER,
             text_color=AppTheme.TEXT_ON_ACCENT,
-            text_color_disabled=AppTheme.TEXT_MUTED,
             corner_radius=6,
             height=36,
         )
-        self.execute_btn.grid(row=0, column=0, padx=(12, 4), pady=10, sticky="ew")
+        self.execute_btn.grid(row=0, column=0, padx=(0, 4), pady=10, sticky="ew")
         
         self.clear_btn = ctk.CTkButton(
             frame,
@@ -236,8 +246,34 @@ class TextToSQLTab:
         
         self.export_btn = ctk.CTkButton(
             frame,
-            text="Export Results",
+            text="Export",
             command=self.export_results,
+            state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN,
+            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT,
+            corner_radius=6,
+            height=36,
+        )
+        self.export_btn.grid(row=0, column=2, padx=4, pady=10, sticky="ew")
+
+        self.visualize_btn = ctk.CTkButton(
+            frame,
+            text="Visualize",
+            command=self.toggle_visualization,
+            state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN,
+            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT,
+            corner_radius=6,
+            height=36,
+        )
+        self.visualize_btn.grid(row=0, column=3, padx=(4, 0), pady=10, sticky="ew")
+
+        self.explain_btn = ctk.CTkButton(
+            frame,
+            text="Explain Query",
+            command=self.explain_query,
             state="disabled",
             fg_color=AppTheme.NEUTRAL_BTN,
             hover_color=AppTheme.NEUTRAL_BTN_HOVER,
@@ -246,16 +282,15 @@ class TextToSQLTab:
             corner_radius=6,
             height=36,
         )
-        self.export_btn.grid(row=0, column=2, padx=(4, 12), pady=10, sticky="ew")
+        self.explain_btn.grid(row=1, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="ew")
     
     def create_schema_viewer(self, parent):
         """Database schema viewer with import functionality"""
         frame = ctk.CTkFrame(
             parent,
-            corner_radius=8,
-            fg_color=AppTheme.CARD_BG,
-            border_width=1,
-            border_color=AppTheme.BORDER_SOFT,
+            corner_radius=0,
+            fg_color="transparent",
+            border_width=0,
         )
         frame.grid(row=0, column=0, pady=(0, 8), sticky="ew")
         frame.grid_columnconfigure(0, weight=1)
@@ -302,6 +337,18 @@ class TextToSQLTab:
             corner_radius=6,
         )
         self.tables_btn.grid(row=3, column=0, padx=12, pady=(0, 6), sticky="ew")
+
+        self.history_btn = ctk.CTkButton(
+            frame,
+            text="View History",
+            command=self.show_history,
+            width=150,
+            fg_color=AppTheme.BRAND,
+            hover_color=AppTheme.BRAND_HOVER,
+            text_color=AppTheme.TEXT_ON_ACCENT,
+            corner_radius=6,
+        )
+        self.history_btn.grid(row=4, column=0, padx=12, pady=(0, 6), sticky="ew")
         
         examples_label = ctk.CTkLabel(
             frame,
@@ -310,8 +357,42 @@ class TextToSQLTab:
             font=ctk.CTkFont(size=10),
             text_color=AppTheme.TEXT_MUTED,
         )
-        examples_label.grid(row=4, column=0, padx=12, pady=(2, 10), sticky="w")
+        examples_label.grid(row=5, column=0, padx=12, pady=(2, 10), sticky="w")
     
+    def save_favorite(self):
+        """Save current query to favorites"""
+        if not self.current_query:
+            return
+            
+        question = self.input_text.get().strip()
+        try:
+            self.module.save_query(question, self.current_query, is_favorite=True)
+            self.app.update_status("Query saved to favorites!", "success")
+        except Exception as e:
+            self.app.update_status(f"Failed to save: {str(e)}", "error")
+
+    def show_history(self):
+        """Display query history"""
+        if not self.module:
+            return
+            
+        try:
+            history = self.module.get_history()
+            if not history:
+                self.update_results("No history yet.")
+                return
+                
+            output = ["QUERY HISTORY", "=" * 40, ""]
+            for item in history:
+                output.append(f"[{item['timestamp']}]")
+                output.append(f"Q: {item['question']}")
+                output.append(f"SQL: {item['sql_query'][:50]}...")
+                output.append("-" * 20)
+            
+            self.update_results("\n".join(output))
+        except Exception as e:
+            self.update_results(f"Error loading history: {str(e)}")
+            
     def generate_sql(self):
         """Generate SQL from natural language"""
         if not self.module:
@@ -338,6 +419,8 @@ class TextToSQLTab:
                 self.current_query = sql_query
                 self.update_sql(sql_query)
                 self._set_button_state(self.execute_btn, "normal")
+                self._set_button_state(self.explain_btn, "normal")
+                self._set_button_state(self.save_favorite_btn, "normal")
                 
                 self.app.update_status("SQL query generated successfully", "success")
                 self.logger.info(f"SQL generated for: {question}")
@@ -351,7 +434,74 @@ class TextToSQLTab:
         
         thread = threading.Thread(target=task, daemon=True)
         thread.start()
+
+    def explain_query(self):
+        """Explain the current SQL query"""
+        if not self.module or not self.current_query:
+            return
+            
+        def task():
+            try:
+                self.update_results("🔍 Generating explanation...")
+                self.app.update_status("Generating explanation...", "info")
+                self._set_button_state(self.explain_btn, "disabled")
+                
+                explanation = self.module.explain_sql(self.current_query)
+                self.update_results(f"EXPLANATION:\n\n{explanation}")
+                self.app.update_status("Explanation generated", "success")
+                
+            except Exception as e:
+                self.update_results(f"❌ Error generating explanation:\n\n{str(e)}")
+                self.app.update_status("Explanation failed", "error")
+            finally:
+                self._set_button_state(self.explain_btn, "normal")
+        
+        threading.Thread(target=task, daemon=True).start()
     
+    def toggle_visualization(self):
+        """Toggle between text and chart view"""
+        if not hasattr(self, 'current_df') or self.current_df is None:
+            return
+            
+        if self.is_visualizing:
+            self.chart_frame.grid_forget()
+            self.results_text.grid(row=0, column=0, sticky="nsew")
+            self.visualize_btn.configure(text="Visualize")
+            self.is_visualizing = False
+        else:
+            self.results_text.grid_forget()
+            self._render_chart()
+            self.chart_frame.grid(row=0, column=0, sticky="nsew")
+            self.visualize_btn.configure(text="Show Text")
+            self.is_visualizing = True
+
+    def _render_chart(self):
+        """Render matplotlib chart"""
+        # Clear existing
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+            
+        fig, ax = plt.subplots(figsize=(5, 3), dpi=100)
+        fig.patch.set_facecolor('#111111')
+        ax.set_facecolor('#111111')
+        
+        # Simple auto-plot (first numeric column vs index/date)
+        df = self.current_df
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        if len(numeric_cols) > 0:
+            df[numeric_cols[0]].plot(ax=ax, color='#5B9DFF')
+            
+        ax.tick_params(colors='#B4B4B4')
+        ax.spines['bottom'].set_color('#3A3A3A')
+        ax.spines['left'].set_color('#3A3A3A')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        plt.close(fig)
+
     def execute_query(self):
         """Execute the SQL query"""
         if not self.module:
@@ -369,13 +519,17 @@ class TextToSQLTab:
                 
                 # Format and display results
                 if results:
+                    self.current_df = pd.DataFrame(results)
                     formatted = self._format_results(results)
                     self.update_results(formatted)
                     self._set_button_state(self.export_btn, "normal")
+                    self._set_button_state(self.visualize_btn, "normal")
                     self.app.update_status(f"Query returned {len(results)} rows", "success")
                 else:
+                    self.current_df = None
                     self.update_results("No results found.")
                     self.app.update_status("Query returned no results", "warning")
+                    self._set_button_state(self.visualize_btn, "disabled")
                 
                 self.logger.info(f"Query executed: {len(results) if results else 0} rows")
                 
@@ -413,8 +567,11 @@ class TextToSQLTab:
         self.sql_text.delete("1.0", "end")
         self.results_text.delete("1.0", "end")
         self.current_query = None
+        self.current_df = None
+        self.is_visualizing = False
         self._set_button_state(self.execute_btn, "disabled")
         self._set_button_state(self.export_btn, "disabled")
+        self._set_button_state(self.visualize_btn, "disabled")
         self.app.update_status("Cleared all fields", "muted")
         self.logger.info("All fields cleared")
     

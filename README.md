@@ -1,3 +1,5 @@
+# SchemaVaultLocal
+
 **GPU Settings:**
 - Ollama auto-detects CUDA
 - Runs on CPU if GPU unavailable (slower)
