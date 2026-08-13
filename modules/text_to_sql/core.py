@@ -173,7 +173,7 @@ class TextToSQLModule:
     # ------------------------------------------------------------------ #
     def generate_sql(self, question: str) -> str:
         """Generate SQL with auto-correction using the real execution error."""
-        max_retries = 2
+        max_retries = 3
         for attempt in range(max_retries + 1):
             try:
                 self.logger.info(f"Generating SQL (Attempt {attempt + 1}) for: {question}")

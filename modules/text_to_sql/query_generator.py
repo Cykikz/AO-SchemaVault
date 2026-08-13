@@ -48,7 +48,11 @@ class SQLGenerator:
             f"(LAG/LEAD/OVER) must live in a subquery/CTE, never in a WHERE clause, "
             f"and use STRFTIME (never EXTRACT, date_part, or INTERVAL date math - the "
             f"date column is a TEXT ISO string, so step between rows with LAG/LEAD, "
-            f"not arithmetic). Output ONLY the corrected "
+            f"not arithmetic). If the error is 'no such column: X' and X IS in the "
+            f"schema, the problem is usually that a CTE/subquery did not SELECT column "
+            f"X even though the outer query references it - add X to the CTE's SELECT "
+            f"list (every column used in the outer SELECT or WHERE must be carried "
+            f"through the CTE). Output ONLY the corrected "
             f"SQL, no explanation, no markdown."
         )
         self.logger.info("Requesting SQL self-correction from model")
@@ -94,7 +98,12 @@ class SQLGenerator:
         """Return a bucket name that tunes the prompt."""
         q = " ".join(question.lower().split())
 
-        # 1. Multi-condition priority (multiple ANDed clauses, or explicit intent words)
+        # 1. Set-logic ALL/ANY priority (e.g. "higher than every product in X")
+        if re.search(r'\b(price|prices)\b.*\b(higher|lower|more|less|greater|cheaper|expensive)\b.*\b(every|all|any|each)\b', q) or \
+           re.search(r'\b(higher|lower|more|less|greater|cheaper)\s+than\s+(every|all|any|each)\b', q):
+            return "set_logic"
+
+        # 2. Multi-condition priority (multiple ANDed clauses, or explicit intent words)
         if re.search(r'\b(and.*and|combined|confluence|together)\b', q):
              return "multi_condition"
 
@@ -163,26 +172,53 @@ class SQLGenerator:
                 "  SELECT date, close FROM p\n"
                 "  WHERE fast > slow AND COALESCE(prev_fast,0) <= COALESCE(prev_slow,0)\n"
                 "A 'crossed above' means the fast line is above the slow line TODAY but was "
-                "NOT above it the previous trading day."
+                "NOT above it the previous trading day.\n"
+                "CRITICAL column-carry rule: every column you reference in the OUTER query "
+                "or in the WHERE clause must ALSO appear in the CTE's SELECT list. If you "
+                "filter on 'fast' and 'slow' (e.g. ma_7 and ma_30), both must be selected "
+                "inside the WITH block. Never reference a base-table column in the outer "
+                "SELECT/WHERE unless the CTE selected it."
             ),
             "cross_below": (
                 "This is a crossover-below query. IMPORTANT: window functions (LAG/LEAD) cannot "
                 "appear in a WHERE clause in SQLite. Compute LAG(fast) and LAG(slow) in a "
                 "subquery/CTE ordered by date, then in the outer query filter where fast < slow "
-                "AND the previous fast >= previous slow."
+                "AND the previous fast >= previous slow.\n"
+                "CRITICAL column-carry rule: every column referenced in the outer query or "
+                "WHERE clause must ALSO be selected inside the CTE/subquery. Never reference a "
+                "base-table column in the outer SELECT/WHERE unless the CTE selected it."
             ),
             "multi_condition": (
                 "This query combines multiple conditions or asks for rows that satisfy more "
                 "than one requirement.\n"
                 "If it asks for rows meeting several conditions at once, join the needed tables "
                 "and use WHERE with AND (e.g. WHERE col1 > x AND col2 < y).\n"
-                "If it asks for things that appear in BOTH/A L L of several groups (e.g. "
+                "If it asks for things that appear in BOTH/ALL of several groups (e.g. "
                 "customers who bought BOTH 'Electronics' AND 'Furniture'), use GROUP BY on the "
                 "entity key and HAVING COUNT(DISTINCT group_col) = <number of groups> - never a "
                 "plain IN (...) list, which returns rows matching ANY group.\n"
                 "If it asks for things present in one set but NOT another (e.g. never ordered), "
                 "use LEFT JOIN ... WHERE other.key IS NULL or NOT EXISTS.\n"
                 "Use SQLite syntax and real column names from the schema."
+            ),
+            "set_logic": (
+                "This is a set-comparison query against a whole group, e.g. products whose "
+                "price is higher than EVERY product in a category, or cheaper than ALL of them.\n"
+                "The correct SQLite pattern compares against the group's extreme with a "
+                "NOT EXISTS / ALL pattern, or counts how many group members the candidate "
+                "beats:\n"
+                "  -- higher than EVERY item in 'Electronics':\n"
+                "  SELECT p1.name FROM products p1\n"
+                "  WHERE p1.category != 'Electronics'\n"
+                "    AND NOT EXISTS (\n"
+                "      SELECT 1 FROM products p2\n"
+                "      WHERE p2.category = 'Electronics' AND p2.price >= p1.price\n"
+                "    )\n"
+                "Equivalent alternative: compare p1.price to the MAX price of the group\n"
+                "  SELECT name FROM products\n"
+                "  WHERE price > (SELECT MAX(price) FROM products WHERE category = 'Electronics')\n"
+                "Use real column names from the schema. Never use a self-join with a bare "
+                "category filter for this - it cannot express 'beats every member'."
             ),
             "streak": (
                 "This asks for consecutive-day sequences (e.g. N days in a row meeting a "

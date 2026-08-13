@@ -1,9 +1,39 @@
-# SchemaVaultLocal
+# SchemaVaultLocal 🚀
+*The ultimate local-first SQL workbench for data analysts and quant researchers.*
 
-**GPU Settings:**
-- Ollama auto-detects CUDA
-- Runs on CPU if GPU unavailable (slower)
-- RTX 3060 6GB recommended
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+SchemaVaultLocal is a **local-first, private-by-design** SQL workbench. It leverages local LLMs (via Ollama) to convert natural language into expert-level SQL, enabling seamless data analysis without ever sending your sensitive datasets to the cloud.
+
+---
+
+## ✨ Key Features
+- **Intelligent Text-to-SQL**: Auto-generates complex, window-function-optimized SQL (including crossovers, divergence, and trends).
+- **Self-Correcting Engine**: Automatically catches execution errors and retries with context to ensure perfect query generation.
+- **Data Visualization**: Instant chart rendering for time-series and numerical insights.
+- **Privacy First**: All processing runs locally on your machine. No API keys, no data leaks.
+- **Query Workbench**: Save favorites, view execution history, and refine queries iteratively with LLM feedback.
+- **Universal Import**: Drag-and-drop CSV/Excel files into your own local database instantly.
+
+---
+
+## 🚀 Quick Start
+1.  **Install Prerequisites**:
+    - [Ollama](https://ollama.com/) (Ensure it's running).
+    - Python 3.10+
+2.  **Setup**:
+    ```bash
+    pip install -r requirements.txt
+    python main.py
+    ```
+
+---
+
+## 🛠 Tech Stack
+- **Inference**: Ollama (Llama 3.1:8b / SQLCoder)
+- **GUI**: CustomTkinter (Modern, Dark/Light themed)
+- **Data**: Pandas + SQLite3
+- **Visualization**: Matplotlib
 
 ---
 
@@ -12,66 +42,23 @@
 ### Completed ✅
 - [x] Text-to-SQL with expert-level queries
 - [x] CSV/Excel import
-- [x] Multi-table support
 - [x] Query classification system
-- [x] Schema visualization
-- [x] Export functionality
-
-### In Progress 🔄
-- [ ] SQL query history & favorites
-- [ ] SQL explanation mode
+- [x] SQL Query history & favorites
+- [x] SQL explanation mode
+- [x] Data visualization (charts)
+- [x] Iterative query refinement system
 
 ### Future Enhancements 💡
-- [ ] SQL guardrails (recommended first after core functionality is complete)
-- [ ] Query history/favorites
-- [ ] Data visualization (charts)
-- [ ] SQL query explanation
+- [ ] SQL guardrails (Safety filters)
 - [ ] Performance optimization tips
 - [ ] Custom model fine-tuning
 
 ---
 
-## 🤝 Contributing
-
-Contributions welcome! Areas of interest:
-- Improving SQL query accuracy
-- Adding new data connectors (PostgreSQL, MySQL)
-- UI/UX enhancements
-
----
-
-## 📝 License
-
-MIT License
-
----
-
 ## 🙏 Acknowledgments
-
 - **Ollama** - Local LLM inference
 - **CustomTkinter** - Modern GUI framework
-- **llama3.1:8b** - Meta's powerful language model
 - **Pandas** - Data manipulation
-
----
-
-## 📧 Support
-
-For issues or questions:
-1. Check logs in `logs/app_YYYYMMDD.log`
-2. Review schema with "View Schema" button
-3. Try rephrasing your question
-4. Open an issue on GitHub
-
----
-
-## 🎉 Success Stories
-
-**"Generated perfect SQL for 50+ complex financial queries!"** - Trading Analyst
-
-**"Saved hours analyzing customer data with natural language queries."** - E-commerce Manager
-
-**"The crossover detection is better than commercial tools!"** - Quantitative Researcher
 
 ---
 
