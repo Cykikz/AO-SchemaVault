@@ -6,6 +6,7 @@ import customtkinter as ctk
 from config.settings import GUIConfig
 from gui.theme import AppTheme
 from gui.tabs.sql_tab import TextToSQLTab
+from gui.tabs.settings_tab import SettingsTab
 from utils.logger import setup_logger
 
 
@@ -99,9 +100,22 @@ class MainApplication(ctk.CTk):
             corner_radius=6,
             height=36,
             anchor="w",
-            state="disabled",
+            command=lambda: self.switch_tab("sql")
         )
         nav_button.grid(row=0, column=1, padx=(8, 8), pady=8, sticky="ew")
+        
+        self.settings_button = ctk.CTkButton(
+            nav_row,
+            text="Settings",
+            fg_color="transparent",
+            hover_color=AppTheme.CARD_BG,
+            text_color=AppTheme.TEXT_SECONDARY,
+            corner_radius=6,
+            height=36,
+            anchor="w",
+            command=lambda: self.switch_tab("settings")
+        )
+        self.settings_button.grid(row=1, column=1, padx=(8, 8), pady=8, sticky="ew")
 
         hint = ctk.CTkLabel(
             sidebar,
@@ -192,12 +206,23 @@ class MainApplication(ctk.CTk):
         )
         self.page_status_label.grid(row=0, column=1, padx=12, pady=10, sticky="e")
 
-        workspace = ctk.CTkFrame(content, corner_radius=0, fg_color="transparent")
-        workspace.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 12))
-        workspace.grid_rowconfigure(0, weight=1)
-        workspace.grid_columnconfigure(0, weight=1)
+        self.workspace = ctk.CTkFrame(content, corner_radius=0, fg_color="transparent")
+        self.workspace.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 12))
+        self.workspace.grid_rowconfigure(0, weight=1)
+        self.workspace.grid_columnconfigure(0, weight=1)
 
-        self.init_sql_view(workspace)
+        self.init_sql_view(self.workspace)
+
+    def switch_tab(self, tab_name):
+        """Switch between tabs."""
+        # Clear workspace
+        for widget in self.workspace.winfo_children():
+            widget.destroy()
+            
+        if tab_name == "sql":
+            self.init_sql_view(self.workspace)
+        elif tab_name == "settings":
+            self.init_settings_view(self.workspace)
 
     def init_sql_view(self, parent):
         """Initialize SQL workspace."""
@@ -208,9 +233,22 @@ class MainApplication(ctk.CTk):
             self.logger.error(f"Text-to-SQL view failed: {e}")
             error_label = ctk.CTkLabel(
                 parent,
-                text=f"{GUIConfig.TAB_TEXT_TO_SQL} failed to load\n\n{e}",
+                text=f"Text-to-SQL failed to load\n\n{e}",
                 font=ctk.CTkFont(size=14),
-                text_color=GUIConfig.COLOR_ERROR,
+            )
+            error_label.pack(expand=True, pady=50)
+
+    def init_settings_view(self, parent):
+        """Initialize Settings workspace."""
+        try:
+            SettingsTab(parent, self)
+            self.logger.info("Settings view initialized")
+        except Exception as e:
+            self.logger.error(f"Settings view failed: {e}")
+            error_label = ctk.CTkLabel(
+                parent,
+                text=f"Settings failed to load\n\n{e}",
+                font=ctk.CTkFont(size=14),
             )
             error_label.pack(expand=True, pady=50)
 

@@ -54,6 +54,39 @@ class SQLGenerator:
         self.logger.info("Requesting SQL self-correction from model")
         return self._call_llm(prompt)
 
+    def refine(self, question: str, sql: str, feedback: str) -> str:
+        """
+        Ask the model to adjust a previously generated SQL statement based on
+        user feedback. Returns the refined SQL (unverified). Raises if the LLM
+        call fails.
+        """
+        prompt = (
+            f"A SQLite query was generated for the question below, and the user "
+            f"provided feedback on what should change.\n\n"
+            f"QUESTION: {question}\n\n"
+            f"CURRENT SQL:\n{sql}\n\n"
+            f"USER FEEDBACK: {feedback}\n\n"
+            f"SCHEMA (use only these tables/columns):\n{self._describe_schema()}\n\n"
+            f"RULES:\n"
+            f"1. Output ONLY the corrected SQL query. No explanations, no markdown "
+            f"fences, no trailing semicolon.\n"
+            f"2. Use the real column names from the schema above. If a needed column "
+            f"does not exist, do not invent it.\n"
+            f"3. Use SQLite syntax. For dates use STRFTIME('%Y-%m', col) for month "
+            f"grouping and STRFTIME('%Y-%m-%d', col) for day comparisons. NEVER use "
+            f"EXTRACT(), date_part(), or INTERVAL arithmetic. The date column is a "
+            f"TEXT ISO string (YYYY-MM-DD), so step between rows with LAG()/LEAD() "
+            f"ordered by the date, never date arithmetic.\n"
+            f"4. Only use SELECT statements (read-only). Never generate "
+            f"INSERT/UPDATE/DELETE/DROP/ALTER.\n"
+            f"5. Window functions (LAG/LEAD/OVER) must be wrapped in a subquery/CTE "
+            f"and never appear in a WHERE clause.\n"
+            f"6. Always finish with a complete, executable final SELECT.\n\n"
+            f"CORRECTED SQL:"
+        )
+        self.logger.info("Requesting SQL refinement from model")
+        return self._call_llm(prompt)
+
     # ------------------------------------------------------------------ #
     # Classification
     # ------------------------------------------------------------------ #
@@ -61,24 +94,32 @@ class SQLGenerator:
         """Return a bucket name that tunes the prompt."""
         q = " ".join(question.lower().split())
 
-        # Forward / subsequent window takes priority: "next N days after X"
-        # implies a forward-looking aggregate even if the trigger is a crossover.
+        # 1. Multi-condition priority (multiple ANDed clauses, or explicit intent words)
+        if re.search(r'\b(and.*and|combined|confluence|together)\b', q):
+             return "multi_condition"
+
+        # 2. Forward window
         if re.search(r'\b(subsequent|following|next \d+ (trading )?days|over the next|after the (signal|cross))\b', q):
             return "forward_window"
 
+        # 3. Crossover
         if re.search(r'\b(cross(es|ed|ing)?\s*(above|below|over|under))\b', q) or \
            re.search(r'\b(golden|death)\s*cross\b', q):
             return "cross_below" if re.search(r'\b(crosses? below|death cross)\b', q) else "cross_above"
 
+        # 4. Streak
         if re.search(r'\b(consecutive|streak|in a row|in succession|run of|days in a row)\b', q):
             return "streak"
 
+        # 5. Running
         if re.search(r'\b(running|rolling|cumulative|drawdown|peak|all-time high)\b', q):
             return "running"
 
+        # 6. Categorize
         if re.search(r'\b(categoriz\w*|regime\w*|bucket\w*|classif\w*|segments?)\b|\bgroup by\s+(category|bucket)\b', q):
             return "categorize"
 
+        # 7. Time Series
         if re.search(r'\b(monthly|by month|per month|calendar month)\b', q):
             return "time_series"
 
@@ -129,6 +170,19 @@ class SQLGenerator:
                 "appear in a WHERE clause in SQLite. Compute LAG(fast) and LAG(slow) in a "
                 "subquery/CTE ordered by date, then in the outer query filter where fast < slow "
                 "AND the previous fast >= previous slow."
+            ),
+            "multi_condition": (
+                "This query combines multiple conditions or asks for rows that satisfy more "
+                "than one requirement.\n"
+                "If it asks for rows meeting several conditions at once, join the needed tables "
+                "and use WHERE with AND (e.g. WHERE col1 > x AND col2 < y).\n"
+                "If it asks for things that appear in BOTH/A L L of several groups (e.g. "
+                "customers who bought BOTH 'Electronics' AND 'Furniture'), use GROUP BY on the "
+                "entity key and HAVING COUNT(DISTINCT group_col) = <number of groups> - never a "
+                "plain IN (...) list, which returns rows matching ANY group.\n"
+                "If it asks for things present in one set but NOT another (e.g. never ordered), "
+                "use LEFT JOIN ... WHERE other.key IS NULL or NOT EXISTS.\n"
+                "Use SQLite syntax and real column names from the schema."
             ),
             "streak": (
                 "This asks for consecutive-day sequences (e.g. N days in a row meeting a "
@@ -258,6 +312,22 @@ SQL:"""
     # ------------------------------------------------------------------ #
     # LLM call + cleanup
     # ------------------------------------------------------------------ #
+    def _validate_columns(self, sql: str):
+        """Check if columns in SQL exist in schema."""
+        schema_detail = self._describe_schema()
+        # Extract columns (very basic regex)
+        cols = set(re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', sql))
+        
+        # Check against schema columns
+        all_schema_cols = set(re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', schema_detail))
+        
+        # Filter out common SQL keywords
+        keywords = {'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN', 'ON', 'AS', 'WITH', 'GROUP', 'BY', 'ORDER', 'LIMIT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'LAG', 'LEAD', 'OVER', 'PARTITION', 'SUM', 'AVG', 'COUNT', 'MAX', 'MIN', 'STRFTIME', 'COALESCE'}
+        
+        missing = cols - all_schema_cols - keywords
+        if missing:
+             self.logger.warning(f"Potentially invalid columns detected: {missing}")
+
     def _call_llm(self, prompt: str) -> str:
         try:
             response = ollama.generate(
@@ -268,7 +338,9 @@ SQL:"""
                     'num_predict': 1500,
                 },
             )
-            return self._clean_sql_response(response.get('response', ''))
+            sql = self._clean_sql_response(response.get('response', ''))
+            self._validate_columns(sql)
+            return sql
         except Exception as e:
             self.logger.error(f"Ollama call failed: {e}")
             raise Exception(

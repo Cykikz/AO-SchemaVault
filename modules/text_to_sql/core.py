@@ -23,6 +23,7 @@ class TextToSQLModule:
         self.db_path = TextToSQLConfig.SAMPLE_DB_PATH
         self.generator = SQLGenerator(self.db_path)
         self.last_error = None
+        self.last_bad_sql = None
         self._initialize_database()
 
     # ------------------------------------------------------------------ #
@@ -238,6 +239,22 @@ class TextToSQLModule:
         )
         return response['response'].strip()
 
+    def refine_sql(self, original_question: str, original_sql: str, feedback: str) -> str:
+        """Refine SQL based on user feedback (schema-aware)."""
+        try:
+            return self.generator.refine(original_question, original_sql, feedback)
+        except Exception as e:
+            self.logger.error(f"SQL refinement failed: {e}")
+            raise
+
+    def _classify_query_type(self, question: str) -> str:
+        """Shim for test suite compatibility."""
+        return self.generator._classify_query_type(question)
+
+    def _clean_sql_response(self, response: str) -> str:
+        """Shim for test suite compatibility."""
+        return self.generator._clean_sql_response(response)
+
     # ------------------------------------------------------------------ #
     # Schema / data access
     # ------------------------------------------------------------------ #
@@ -274,20 +291,23 @@ class TextToSQLModule:
         """Import CSV/Excel file"""
         try:
             file_ext = Path(file_path).suffix.lower()
-
+            
             if file_ext == '.csv':
                 df = pd.read_csv(file_path)
             elif file_ext in ['.xlsx', '.xls']:
                 df = pd.read_excel(file_path)
             else:
                 raise ValueError(f"Unsupported: {file_ext}")
+            
+            if df.empty:
+                raise ValueError("The file appears to be empty or has no data columns.")
 
             if not table_name:
                 table_name = self._sanitize_table_name(Path(file_path).stem)
-
+            
             df = self._clean_dataframe(df)
             self._create_table_from_dataframe(df, table_name)
-
+            
             return {
                 'success': True,
                 'table_name': table_name,
@@ -295,7 +315,7 @@ class TextToSQLModule:
                 'columns': len(df.columns),
                 'column_names': list(df.columns)
             }
-
+            
         except Exception as e:
             raise Exception(f"Import failed: {str(e)}")
 

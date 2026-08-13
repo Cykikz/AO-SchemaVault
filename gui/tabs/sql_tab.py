@@ -209,80 +209,54 @@ class TextToSQLTab:
         self.is_visualizing = False
     
     def create_action_buttons(self, parent):
-        """Action buttons"""
-        frame = ctk.CTkFrame(
-            parent,
-            corner_radius=0,
-            fg_color="transparent",
-            border_width=0,
-        )
-        frame.grid(row=2, column=0, sticky="nsew")
+        """Action buttons with clean, consistent layout."""
+        frame = ctk.CTkFrame(parent, corner_radius=0, fg_color="transparent", border_width=0)
+        frame.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
         
+        # Row 1
         self.execute_btn = ctk.CTkButton(
-            frame,
-            text="Execute Query",
-            command=self.execute_query,
-            state="disabled",
-            fg_color=AppTheme.BRAND,
-            hover_color=AppTheme.BRAND_HOVER,
-            text_color=AppTheme.TEXT_ON_ACCENT,
-            corner_radius=6,
-            height=36,
+            frame, text="Execute", command=self.execute_query, state="disabled",
+            fg_color=AppTheme.BRAND, hover_color=AppTheme.BRAND_HOVER,
+            text_color=AppTheme.TEXT_ON_ACCENT, height=36, corner_radius=6
         )
-        self.execute_btn.grid(row=0, column=0, padx=(0, 4), pady=10, sticky="ew")
+        self.execute_btn.grid(row=0, column=0, padx=(0, 5), pady=5, sticky="ew")
         
-        self.clear_btn = ctk.CTkButton(
-            frame,
-            text="Clear",
-            command=self.clear_all,
-            fg_color=AppTheme.NEUTRAL_BTN,
-            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
-            text_color=AppTheme.NEUTRAL_BTN_TEXT,
-            corner_radius=6,
-            height=36,
-        )
-        self.clear_btn.grid(row=0, column=1, padx=4, pady=10, sticky="ew")
-        
-        self.export_btn = ctk.CTkButton(
-            frame,
-            text="Export",
-            command=self.export_results,
-            state="disabled",
-            fg_color=AppTheme.NEUTRAL_BTN,
-            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
-            text_color=AppTheme.NEUTRAL_BTN_TEXT,
-            corner_radius=6,
-            height=36,
-        )
-        self.export_btn.grid(row=0, column=2, padx=4, pady=10, sticky="ew")
-
         self.visualize_btn = ctk.CTkButton(
-            frame,
-            text="Visualize",
-            command=self.toggle_visualization,
-            state="disabled",
-            fg_color=AppTheme.NEUTRAL_BTN,
-            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
-            text_color=AppTheme.NEUTRAL_BTN_TEXT,
-            corner_radius=6,
-            height=36,
+            frame, text="Visualize", command=self.toggle_visualization, state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN, hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT, height=36, corner_radius=6
         )
-        self.visualize_btn.grid(row=0, column=3, padx=(4, 0), pady=10, sticky="ew")
+        self.visualize_btn.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+
+        self.export_btn = ctk.CTkButton(
+            frame, text="Export", command=self.export_results, state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN, hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT, height=36, corner_radius=6
+        )
+        self.export_btn.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
+
+        self.clear_btn = ctk.CTkButton(
+            frame, text="Clear", command=self.clear_all,
+            fg_color=AppTheme.NEUTRAL_BTN, hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT, height=36, corner_radius=6
+        )
+        self.clear_btn.grid(row=0, column=3, padx=(5, 0), pady=5, sticky="ew")
+
+        # Row 2
+        self.refine_btn = ctk.CTkButton(
+            frame, text="Refine", command=self.refine_query, state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN, hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT, height=36, corner_radius=6
+        )
+        self.refine_btn.grid(row=1, column=0, columnspan=2, padx=(0, 5), pady=5, sticky="ew")
 
         self.explain_btn = ctk.CTkButton(
-            frame,
-            text="Explain Query",
-            command=self.explain_query,
-            state="disabled",
-            fg_color=AppTheme.NEUTRAL_BTN,
-            hover_color=AppTheme.NEUTRAL_BTN_HOVER,
-            text_color=AppTheme.NEUTRAL_BTN_TEXT,
-            text_color_disabled=AppTheme.TEXT_MUTED,
-            corner_radius=6,
-            height=36,
+            frame, text="Explain", command=self.explain_query, state="disabled",
+            fg_color=AppTheme.NEUTRAL_BTN, hover_color=AppTheme.NEUTRAL_BTN_HOVER,
+            text_color=AppTheme.NEUTRAL_BTN_TEXT, height=36, corner_radius=6
         )
-        self.explain_btn.grid(row=1, column=0, columnspan=3, padx=12, pady=(0, 10), sticky="ew")
+        self.explain_btn.grid(row=1, column=2, columnspan=2, padx=(5, 0), pady=5, sticky="ew")
     
     def create_schema_viewer(self, parent):
         """Database schema viewer with import functionality"""
@@ -393,6 +367,32 @@ class TextToSQLTab:
         except Exception as e:
             self.update_results(f"Error loading history: {str(e)}")
             
+    def refine_query(self):
+        """Ask user for feedback and refine SQL"""
+        dialog = ctk.CTkInputDialog(text="What was wrong with the previous query?", title="Refine SQL")
+        feedback = dialog.get_input()
+        
+        if not feedback or not self.current_query:
+            return
+            
+        def task():
+            try:
+                self.update_sql("🔄 Refining SQL...")
+                self._set_button_state(self.refine_btn, "disabled")
+                
+                original_question = self.input_text.get().strip()
+                new_sql = self.module.refine_sql(original_question, self.current_query, feedback)
+                
+                self.current_query = new_sql
+                self.update_sql(new_sql)
+                self.app.update_status("SQL refined successfully", "success")
+            except Exception as e:
+                self.update_sql(f"❌ Error refining: {str(e)}")
+            finally:
+                self._set_button_state(self.refine_btn, "normal")
+                
+        threading.Thread(target=task, daemon=True).start()
+    
     def generate_sql(self):
         """Generate SQL from natural language"""
         if not self.module:
@@ -421,6 +421,7 @@ class TextToSQLTab:
                 self._set_button_state(self.execute_btn, "normal")
                 self._set_button_state(self.explain_btn, "normal")
                 self._set_button_state(self.save_favorite_btn, "normal")
+                self._set_button_state(self.refine_btn, "normal")
                 
                 self.app.update_status("SQL query generated successfully", "success")
                 self.logger.info(f"SQL generated for: {question}")
