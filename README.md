@@ -55,11 +55,11 @@ SchemaVaultLocal is a **local-first, private-by-design** SQL workbench. It lever
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 Acknowledgements
 - **Ollama** - Local LLM inference
 - **CustomTkinter** - Modern GUI framework
 - **Pandas** - Data manipulation
-
+- **Agent Orchestrator** - AI Agent Orchestrator
 ---
 
 **Built with passion for data analysts, traders, researchers, and anyone who works with data!**
