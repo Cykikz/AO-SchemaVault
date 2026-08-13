@@ -25,6 +25,11 @@ SchemaVaultLocal is a **local-first, private-by-design** SQL workbench. It lever
 - **Query Workbench**: Save favorites, view execution history, and refine queries iteratively with LLM feedback.
 - **Universal Import**: Drag-and-drop CSV/Excel files into your own local database instantly.
 
+
+---
+
+**Demo** - https://drive.google.com/drive/folders/1wpL3QrIOLP6uExeI_6teA-icRg-trsub?usp=sharing
+
 ---
 
 ## 🚀 Quick Start
