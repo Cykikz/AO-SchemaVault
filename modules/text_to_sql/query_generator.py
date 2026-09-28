@@ -114,7 +114,7 @@ class SQLGenerator:
         # 3. Crossover
         if re.search(r'\b(cross(es|ed|ing)?\s*(above|below|over|under))\b', q) or \
            re.search(r'\b(golden|death)\s*cross\b', q):
-            return "cross_below" if re.search(r'\b(crosses? below|death cross)\b', q) else "cross_above"
+            return "cross_below" if re.search(r'\b(cross(e[sd]?|ing)?\s*below|death cross)\b', q) else "cross_above"
 
         # 4. Streak
         if re.search(r'\b(consecutive|streak|in a row|in succession|run of|days in a row)\b', q):
